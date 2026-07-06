@@ -1,4 +1,5 @@
-import tkinter as tk
+#for UI
+import tkinter as tk 
 from tkinter import ttk
 
 from config import STUDENT_FILE, STUDENT_FIELDS, PROGRAM_FILE, PROGRAM_FIELDS, COLLEGE_FILE, COLLEGE_FIELDS
@@ -19,11 +20,14 @@ class SISApp:
 
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill="both", expand=True)
-
-        StudentTab(self.notebook)
-        ProgramTab(self.notebook)
-        CollegeTab(self.notebook)
-
+        
+        self.student_tab = StudentTab(self.notebook)
+        self.program_tab = ProgramTab(self.notebook)
+        self.college_tab = CollegeTab(self.notebook)
+        
+        # wire up cross-tab refresh
+        self.program_tab.student_tab = self.student_tab
+        self.college_tab.program_tab = self.program_tab
 
 if __name__ == "__main__":
     root = tk.Tk()

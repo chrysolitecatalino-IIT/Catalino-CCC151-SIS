@@ -153,6 +153,8 @@ class ProgramTab:
                 if s.get("program_code") == self._editing_code:
                     s["program_code"] = data["code"]
             save_data(STUDENT_FILE, STUDENT_FIELDS, students)
+            if hasattr(self, "student_tab"):
+                self.student_tab.refresh()
         # Replace the matching record in place
         programs = [data if p["code"] == self._editing_code else p for p in programs]
         save_data(PROGRAM_FILE, PROGRAM_FIELDS, programs)
@@ -160,11 +162,15 @@ class ProgramTab:
         self._clear()
 
     def _delete(self, code):
-        if any(s["program_code"] == code for s in load_data(STUDENT_FILE)):
-            messagebox.showerror("Error", "Cannot delete. Program has students.")
-            return
         if not messagebox.askyesno("Confirm", f"Delete program {code}?"):
             return
+        # Cascade: set program_code to "NOT ENROLLED" for all students in this program
+        from config import STUDENT_FIELDS
+        students = load_data(STUDENT_FILE)
+        for s in students:
+            if s.get("program_code") == code:
+                s["program_code"] = "NOT ENROLLED"
+        save_data(STUDENT_FILE, STUDENT_FIELDS, students)
         programs = [p for p in load_data(PROGRAM_FILE) if p["code"] != code]
         save_data(PROGRAM_FILE, PROGRAM_FIELDS, programs)
         self.refresh()

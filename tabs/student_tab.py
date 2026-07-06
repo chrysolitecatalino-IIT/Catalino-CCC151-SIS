@@ -234,6 +234,9 @@ class StudentTab:
             messagebox.showerror("Error", "No student selected for editing.")
             return
         data = {f: self.entries[f].get().strip() for f in STUDENT_FIELDS}
+        if not valid_student_id(data["id"]):
+            messagebox.showerror("Error", "Invalid ID format (YYYY-NNNN).")
+            return
         if not data["firstname"] or not data["lastname"]:
             messagebox.showerror("Error", "First and last name cannot be empty.")
             return
@@ -247,16 +250,15 @@ class StudentTab:
             messagebox.showerror("Error", "Gender cannot be empty.")
             return
         students = load_data(STUDENT_FILE)
-        for s in students:
-            if s["id"] == self._editing_id:
-                for f in STUDENT_FIELDS:
-                    if f != "id":
-                        s[f] = data[f]
-                save_data(STUDENT_FILE, STUDENT_FIELDS, students)
-                self.refresh()
-                self._clear()
+        # If ID changed, make sure the new one doesn't already exist
+        if data["id"] != self._editing_id:
+            if any(s["id"] == data["id"] for s in students):
+                messagebox.showerror("Error", "Student ID already exists.")
                 return
-        messagebox.showerror("Error", "Student not found.")
+        students = [data if s["id"] == self._editing_id else s for s in students]
+        save_data(STUDENT_FILE, STUDENT_FIELDS, students)
+        self.refresh()
+        self._clear()
 
     def _save_edit(self, data, win):
         pass  # superseded by _commit_edit

@@ -32,14 +32,12 @@ class CollegeTab:
 
         btn_frame = tk.Frame(self.tab)
         btn_frame.pack(pady=6)
+        tk.Button(btn_frame, text="Add",   width=9, command=self.add).pack(side="left", padx=4)
+        tk.Button(btn_frame, text="Clear", width=9, command=self._clear).pack(side="left", padx=4)
         self.save_edit_btn = tk.Button(btn_frame, text="Save Edit", width=9,
                                        command=self._commit_edit,
                                        bg="#5cb85c", fg="white")
-        # not packed yet — only shown when editing
-        tk.Button(btn_frame, text="Add",   width=9, command=self.add).pack(side="left", padx=4)
-        tk.Button(btn_frame, text="Clear", width=9, command=self._clear).pack(side="left", padx=4)
 
-        # table header
         header = tk.Frame(self.tab, bg="#3c3f41")
         header.pack(fill="x", padx=10)
         for i, (lbl, w) in enumerate(zip(LABELS, COL_WIDTHS)):
@@ -92,7 +90,7 @@ class CollegeTab:
         self._clear()
         for field, val in zip(COLLEGE_FIELDS, values):
             self.entries[field].insert(0, val)
-        self._editing_code = values[0]  # first field is always "code"
+        self._editing_code = values[0]
         self.save_edit_btn.pack(side="left", padx=4)
         self.save_edit_btn.lift()
 
@@ -120,10 +118,17 @@ class CollegeTab:
 
     def add(self):
         data = {f: self.entries[f].get().strip() for f in COLLEGE_FIELDS}
+
+        if not data.get("code") or not data.get("name"):
+            messagebox.showerror("Error", "Code and Name cannot be empty.")
+            return
+
         colleges = load_data(COLLEGE_FILE)
+
         if any(c["code"] == data["code"] for c in colleges):
             messagebox.showerror("Error", "College code already exists.")
             return
+
         colleges.append(data)
         save_data(COLLEGE_FILE, COLLEGE_FIELDS, colleges)
         self.refresh()
@@ -133,32 +138,44 @@ class CollegeTab:
         if not self._editing_code:
             messagebox.showerror("Error", "No college selected for editing.")
             return
-        data = {f: self.entries[f].get().strip() for f in COLLEGE_FIELDS}
+        new_code = self.entries["code"].get().strip()
+        new_name = self.entries["name"].get().strip()
+        if not new_code or not new_name:
+            messagebox.showerror("Error", "Code and Name cannot be empty.")
+            return
         colleges = load_data(COLLEGE_FILE)
-        # If the code changed, ensure it doesn't clash with another record
-        if data["code"] != self._editing_code:
-            if any(c["code"] == data["code"] for c in colleges):
+        if new_code != self._editing_code:
+            if any(c["code"] == new_code for c in colleges):
                 messagebox.showerror("Error", "College code already exists.")
                 return
-            # Cascade the code change to all programs that reference it
             from config import PROGRAM_FIELDS
             programs = load_data(PROGRAM_FILE)
             for p in programs:
                 if p.get("college_code") == self._editing_code:
-                    p["college_code"] = data["code"]
+                    p["college_code"] = new_code
             save_data(PROGRAM_FILE, PROGRAM_FIELDS, programs)
-        # Replace the matching record in place
-        colleges = [data if c["code"] == self._editing_code else c for c in colleges]
+            if hasattr(self, "program_tab"):
+                self.program_tab.refresh()
+        for c in colleges:
+            if c["code"] == self._editing_code:
+                c["code"] = new_code
+                c["name"] = new_name
+                break
         save_data(COLLEGE_FILE, COLLEGE_FIELDS, colleges)
         self.refresh()
         self._clear()
 
     def _delete(self, code):
-        if any(p["college_code"] == code for p in load_data(PROGRAM_FILE)):
-            messagebox.showerror("Error", "Cannot delete. College has programs.")
-            return
         if not messagebox.askyesno("Confirm", f"Delete college {code}?"):
             return
+        from config import PROGRAM_FIELDS
+        programs = load_data(PROGRAM_FILE)
+        for p in programs:
+            if p.get("college_code") == code:
+                p["college_code"] = "N/A"
+        save_data(PROGRAM_FILE, PROGRAM_FIELDS, programs)
+        if hasattr(self, "program_tab"):
+            self.program_tab.refresh()
         colleges = [c for c in load_data(COLLEGE_FILE) if c["code"] != code]
         save_data(COLLEGE_FILE, COLLEGE_FIELDS, colleges)
         self.refresh()
