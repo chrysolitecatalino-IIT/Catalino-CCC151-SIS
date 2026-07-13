@@ -221,6 +221,8 @@ class ProgramTab:
             if s.get("program_code") == code:
                 s["program_code"] = "NOT ENROLLED"
         save_data(STUDENT_FILE, STUDENT_FIELDS, students)
+        if hasattr(self, "student_tab"):
+            self.student_tab.refresh()
         programs = [p for p in load_data(PROGRAM_FILE) if p["code"] != code]
         save_data(PROGRAM_FILE, PROGRAM_FIELDS, programs)
         self.refresh()
