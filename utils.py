@@ -13,13 +13,13 @@ def ensure_file(filename, headers):
 def load_data(filename):
     if not os.path.exists(filename):
         return []
-    with open(filename, newline="", encoding="utf-8") as f:
+    with open(filename, newline="", encoding="utf-8-sig") as f:
         return list(csv.DictReader(f))
 
 
 def save_data(filename, fieldnames, data):
     with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(data)
 

@@ -15,6 +15,8 @@ class CollegeTab:
         self.tab = ttk.Frame(notebook)
         notebook.add(self.tab, text="Colleges")
         self._editing_code = None
+        self._sort_field = None
+        self._sort_reverse = False
         self._build_ui()
         self.tab.after(100, self.refresh)
 
@@ -38,11 +40,29 @@ class CollegeTab:
                                        command=self._commit_edit,
                                        bg="#5cb85c", fg="white")
 
+        # search bar
+        sf = tk.Frame(self.tab)
+        sf.pack(fill="x", padx=10, pady=(4, 4))
+        tk.Label(sf, text="Search by:").pack(side="left")
+        self.search_field_var = tk.StringVar(value=LABELS[0])
+        search_combo = ttk.Combobox(sf, textvariable=self.search_field_var,
+                                     values=LABELS, state="readonly", width=12)
+        search_combo.pack(side="left", padx=4)
+        search_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh())
+
+        self.search_var = tk.StringVar()
+        self.search_var.trace_add("write", lambda *_: self.refresh())
+        tk.Entry(sf, textvariable=self.search_var, width=25).pack(side="left", padx=4)
+
         header = tk.Frame(self.tab, bg="#3c3f41")
         header.pack(fill="x", padx=10)
-        for i, (lbl, w) in enumerate(zip(LABELS, COL_WIDTHS)):
-            tk.Label(header, text=lbl, bg="#3c3f41", fg="white",
-                     width=w // 7, anchor="w").grid(row=0, column=i, padx=4, pady=3)
+        self._header_labels = {}
+        for i, (lbl, w, field) in enumerate(zip(LABELS, COL_WIDTHS, COLLEGE_FIELDS)):
+            h = tk.Label(header, text=lbl, bg="#3c3f41", fg="white",
+                         width=w // 7, anchor="w", cursor="hand2")
+            h.grid(row=0, column=i, padx=4, pady=3)
+            h.bind("<Button-1>", lambda e, f=field: self._sort_by(f))
+            self._header_labels[field] = (h, lbl)
         tk.Label(header, text="Actions", bg="#3c3f41", fg="white",
                  width=10, anchor="w").grid(row=0, column=len(LABELS), padx=4)
 
@@ -94,11 +114,41 @@ class CollegeTab:
         self.save_edit_btn.pack(side="left", padx=4)
         self.save_edit_btn.lift()
 
+    def _sort_by(self, field):
+        if self._sort_field == field:
+            self._sort_reverse = not self._sort_reverse
+        else:
+            self._sort_field = field
+            self._sort_reverse = False
+        self.refresh()
+
+    def _update_header_arrows(self):
+        for field, (h, base_label) in self._header_labels.items():
+            if field == self._sort_field:
+                arrow = " ▼" if self._sort_reverse else " ▲"
+                h.config(text=base_label + arrow)
+            else:
+                h.config(text=base_label)
+
     def refresh(self):
         for widget in self.rows_frame.winfo_children():
             widget.destroy()
 
-        for row_idx, c in enumerate(load_data(COLLEGE_FILE)):
+        data = load_data(COLLEGE_FILE)
+
+        query = self.search_var.get().strip().lower() if hasattr(self, "search_var") else ""
+        if query:
+            label_to_field = dict(zip(LABELS, COLLEGE_FIELDS))
+            field = label_to_field.get(self.search_field_var.get(), COLLEGE_FIELDS[0])
+            data = [c for c in data if query in c.get(field, "").lower()]
+
+        if self._sort_field:
+            data.sort(key=lambda c: c.get(self._sort_field, "").lower(),
+                      reverse=self._sort_reverse)
+
+        self._update_header_arrows()
+
+        for row_idx, c in enumerate(data):
             bg = "#f0f0f0" if row_idx % 2 == 0 else "#ffffff"
             values = [c.get(f, "") for f in COLLEGE_FIELDS]
 

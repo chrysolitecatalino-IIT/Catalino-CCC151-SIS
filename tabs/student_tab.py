@@ -17,6 +17,8 @@ class StudentTab:
         notebook.add(self.tab, text="Students")
         self._current_page = 0
         self._all_students = []
+        self._sort_field = None
+        self._sort_reverse = False
         self._build_ui()
         self.tab.after(100, self.refresh)
 
@@ -50,17 +52,27 @@ class StudentTab:
         # search bar
         sf = tk.Frame(self.tab)
         sf.pack(fill="x", padx=10, pady=(0, 4))
-        tk.Label(sf, text="Search ID:").pack(side="left")
+        tk.Label(sf, text="Search by:").pack(side="left")
+        self.search_field_var = tk.StringVar(value=LABELS[0])
+        search_combo = ttk.Combobox(sf, textvariable=self.search_field_var,
+                                     values=LABELS, state="readonly", width=12)
+        search_combo.pack(side="left", padx=4)
+        search_combo.bind("<<ComboboxSelected>>", lambda e: self._on_search())
+
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", lambda *_: self._on_search())
-        tk.Entry(sf, textvariable=self.search_var, width=20).pack(side="left", padx=4)
+        tk.Entry(sf, textvariable=self.search_var, width=25).pack(side="left", padx=4)
 
         # table header
         header = tk.Frame(self.tab, bg="#3c3f41")
         header.pack(fill="x", padx=10)
-        for i, (lbl, w) in enumerate(zip(LABELS, COL_WIDTHS)):
-            tk.Label(header, text=lbl, bg="#3c3f41", fg="white",
-                     width=w // 7, anchor="w").grid(row=0, column=i, padx=4, pady=3)
+        self._header_labels = {}
+        for i, (lbl, w, field) in enumerate(zip(LABELS, COL_WIDTHS, STUDENT_FIELDS)):
+            h = tk.Label(header, text=lbl, bg="#3c3f41", fg="white",
+                         width=w // 7, anchor="w", cursor="hand2")
+            h.grid(row=0, column=i, padx=4, pady=3)
+            h.bind("<Button-1>", lambda e, f=field: self._sort_by(f))
+            self._header_labels[field] = (h, lbl)
         tk.Label(header, text="Actions", bg="#3c3f41", fg="white",
                  width=14, anchor="w").grid(row=0, column=len(LABELS), padx=4)
 
@@ -147,14 +159,46 @@ class StudentTab:
 
     # ── refresh ───────────────────────────────────────────────────────────────
 
+    def _sort_by(self, field):
+        if self._sort_field == field:
+            self._sort_reverse = not self._sort_reverse
+        else:
+            self._sort_field = field
+            self._sort_reverse = False
+        self.refresh()
+
+    def _update_header_arrows(self):
+        for field, (h, base_label) in self._header_labels.items():
+            if field == self._sort_field:
+                arrow = " ▼" if self._sort_reverse else " ▲"
+                h.config(text=base_label + arrow)
+            else:
+                h.config(text=base_label)
+
     def refresh(self):
         if not hasattr(self, "rows_frame"):
             return
 
         query = self.search_var.get().strip().lower() if hasattr(self, "search_var") else ""
         students = load_data(STUDENT_FILE)
+
         if query:
-            students = [s for s in students if query in s.get("id", "").lower()]
+            label_to_field = dict(zip(LABELS, STUDENT_FIELDS))
+            field = label_to_field.get(self.search_field_var.get(), "id")
+            students = [s for s in students if query in s.get(field, "").lower()]
+
+        if self._sort_field:
+            def sort_key(s):
+                val = s.get(self._sort_field, "")
+                if self._sort_field == "year":
+                    try:
+                        return (0, int(val))
+                    except ValueError:
+                        return (1, 0)
+                return (0, val.lower())
+            students.sort(key=sort_key, reverse=self._sort_reverse)
+
+        self._update_header_arrows()
 
         self._all_students = students
         self._render_page()
